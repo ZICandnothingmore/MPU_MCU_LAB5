@@ -65,78 +65,93 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//uint8_t temp = 0;
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	// the received character is added into a buffer
-	// a flag is set to indicate that there is a new data.
-	// ADC
-	if (huart->Instance == USART2) {
-//		HAL_UART_Transmit(&huart2, &temp, 1, 50);
-		if (buffer[index_buffer] == 30) {
-			index_buffer = 0;
-		}
-		buffer_flag = 1;
-		HAL_UART_Receive(&huart2, &temp, temp, 1);
-	}
-}
 
 void command_parser_fsm() {
 	//a FSM to extract a command
 	//output: set command_flag and command_data
 
 	int index;
-	if (index_buffer == 0) index = MAX_BUFFER_SIZE - 1;
-	else index = index_buffer - 1;
+	if (index_buffer == 0)
+		index = MAX_BUFFER_SIZE - 1;
+	else
+		index = index_buffer - 1;
 
-	if (BEGIN){
-		switch (parser_check_next){
-			case INIT:
-				if (buffer[index] == '!') parser_check_next = _;
-				break;
-			case _:
-				if (buffer[index] == 'R') parser_check_next = _R;
-				break;
-			case _R:
-				if (buffer[index] == 'S') parser_check_next = _RS;
-				break;
-			case _RS:
-				if (buffer[index] == 'T') parser_check_next = _RST;
-			case _RST:
-				if (buffer[index] == '#') parser_check_next = _RST_;
-				message_UART = INIT;
+	if (BEGIN) {
+		switch (parser_check_next) {
+		case INIT:
+			if (buffer[index] == '!')
+				parser_check_next = _;
+			break;
+		case _:
+			if (buffer[index] == 'R')
+				parser_check_next = _R;
+			break;
+		case _R:
+			if (buffer[index] == 'S')
+				parser_check_next = _RS;
+			break;
+		case _RS:
+			if (buffer[index] == 'T')
+				parser_check_next = _RST;
+		case _RST:
+			if (buffer[index] == '#') {
+				message_UART = SEND;
+				parser_check_next = INIT;
 				END = 1;
 				BEGIN = 0;
-				parser_check_next = INIT;
-			default: parser_check_next = INIT;
-		}
-	}
-
-	if (END){
-		switch(parser_check_next){
-		case INIT:
-			if (buffer[index] == '!') parser_check_next = _;
-		case _:
-			if (buffer[index] == 'O') parser_check_next = O;
-			break;
-		case O:
-			if (buffer[index] == 'K') parser_check_next = OK;
-			break;
-		case OK:
-			if (buffer[index] == '#'){
-				parser_check_next = INIT;
-				message_UART = INIT;
 			}
 		default:
-			parser_check_next = INIT;                                                                                                                                                                                                                                     INIT;
+			parser_check_next = INIT;
 		}
 	}
 
-
+	if (END) {
+		switch (parser_check_next) {
+		case INIT:
+			if (buffer[index] == '!')
+				parser_check_next = _;
+			break;
+		case _:
+			if (buffer[index] == 'O')
+				parser_check_next = O;
+			break;
+		case O:
+			if (buffer[index] == 'K')
+				parser_check_next = OK;
+			break;
+		case OK:
+			if (buffer[index] == '#') {
+				parser_check_next = INIT;
+				message_UART = INIT;
+				BEGIN = 1;
+				END = 0;
+			}
+		default:
+			parser_check_next = INIT;
+		}
+	}
 }
 
 void uart_communication_fsm() {
 	//
-
+	switch (message_UART) {
+	case INIT:
+		break;
+	case SEND:
+		HAL_GPIO_TogglePin(Blinky_LED_GPIO_Port, Blinky_LED_Pin);
+		ADC_value = HAL_ADC_GetValue(&hadc1);
+		HAL_UART_Transmit(&huart2, (void*) str,
+				sprintf(str, "\r!ADC=%d#\r\n", ADC_value), 1000);
+		setTimer(0, 1000);
+		message_UART = WAIT;
+		break;
+	case WAIT:
+		if (isTimerExpired(0))
+			message_UART = SEND;
+		break;
+	default:
+		break;
+	}
 
 }
 /* USER CODE END 0 */
@@ -173,8 +188,8 @@ int main(void) {
 	MX_TIM2_Init();
 	/* USER CODE BEGIN 2 */
 	HAL_UART_Receive_IT(&huart2, &temp, 1);
-	uint32_t ADC_value = 0;
-	char str[50];
+	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_ADC_Start(&hadc1);
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -183,10 +198,12 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-		HAL_GPIO_TogglePin(Blinky_LED_GPIO_Port, Blinky_LED_Pin);
-		ADC_value = HAL_ADC_GetValue(&hadc1);
-		HAL_UART_Transmit(&huart2, (void*) str,	sprintf(str, "\r!ADC=%d#\r\n", ADC_value), 1000);
-		HAL_Delay(500);
+		if (buffer_flag) {
+			command_parser_fsm();
+			buffer_flag = 0;
+		}
+		uart_communication_fsm();
+
 	}
 	/* USER CODE END 3 */
 }
@@ -368,11 +385,22 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-//	timer_run();
-	if(htim->Instance == TIM2) {
-		timer_run();
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	// the received character is added into a buffer
+	// a flag is set to indicate that there is a new data.
+	if (huart->Instance == USART2) {
+//		HAL_UART_Transmit(&huart2, &temp, 1, MAX_BUFFER_SIZE);
+		buffer[index_buffer++] = temp;
+		if (index_buffer == MAX_BUFFER_SIZE) {
+			index_buffer = 0;
+		}
+		buffer_flag = 1;
+		HAL_UART_Receive_IT(&huart2, &temp, 1);
 	}
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	timer_run();
 }
 /* USER CODE END 4 */
 

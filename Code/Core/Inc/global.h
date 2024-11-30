@@ -11,12 +11,15 @@
 #include "main.h"
 
 // FOR PARSER FSM
+
+
 #define INIT	0
 #define _		1
 #define _R		2
 #define _RS		3
 #define _RST	4
 #define _RST_	5
+#define HI		6
 
 #define O			11
 #define OK			12
@@ -29,12 +32,7 @@
 #define MAX_BUFFER_SIZE 30
 
 extern uint8_t temp;
-#define MAX_BUFFER_SIZE	30
-
-extern uint8_t temp;
 extern uint8_t buffer[MAX_BUFFER_SIZE];
-extern uint8_t index_buffer;
-extern uint8_t buffer_flag;
 extern int parser_check_next;
 extern int message_UART;
 extern uint8_t command_flag;
@@ -44,5 +42,8 @@ extern int BEGIN;
 extern int END;
 extern uint8_t index_buffer;
 extern uint8_t buffer_flag;
+
+extern int ADC_value;
+extern char str[50];
 
 #endif /* INC_GLOBAL_H_ */
