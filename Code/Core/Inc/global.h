@@ -19,10 +19,11 @@
 #define _RS		3
 #define _RST	4
 #define _RST_	5
-#define HI		6
 
+//#define END			10
 #define O			11
 #define OK			12
+#define _OK			13
 
 // FOR COMMUNICATION FSM
 #define SEND		21
@@ -45,5 +46,5 @@ extern uint8_t buffer_flag;
 
 extern int ADC_value;
 extern char str[50];
-
+extern int value_flag;
 #endif /* INC_GLOBAL_H_ */

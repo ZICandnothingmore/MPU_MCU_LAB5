@@ -21,3 +21,4 @@ int END = 0;
 
 int ADC_value = 0;
 char str[50];
+int value_flag = 0;
